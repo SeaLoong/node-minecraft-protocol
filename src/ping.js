@@ -40,19 +40,23 @@ function ping (options) {
     client.once('server_info', function (packet) {
       const data = JSON.parse(packet.response)
       const start = Date.now()
-      const maxTime = setTimeout(() => {
+      const maxTimer = setTimeout(() => {
         clearTimeout(closeTimer)
         client.end()
         resolve(data)
       }, options.noPongTimeout)
+      const time = BigInt(Date.now())
       client.once('ping', function (packet) {
         data.latency = Date.now() - start
-        clearTimeout(maxTime)
-        clearTimeout(closeTimer)
-        client.end()
-        resolve(data)
+        if (BigInt(packet.time) === time) {
+          // pong payload should be the same as ping payload
+          clearTimeout(maxTimer)
+          clearTimeout(closeTimer)
+          client.end()
+          resolve(data)
+        }
       })
-      client.write('ping', { time: [0, 0] })
+      client.write('ping', { time })
     })
     client.on('state', function (newState) {
       if (newState === states.STATUS) { client.write('ping_start', {}) }
